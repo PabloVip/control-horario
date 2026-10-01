@@ -2,7 +2,10 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0f172a">
 <title>Mi Fichaje · 3h/día L-V</title>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -10,18 +13,18 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <style>
 :root{--bg:#0f172a;--card:#1e293b;--card2:#334155;--acc:#22c55e;--acc2:#16a34a;--warn:#f59e0b;--red:#ef4444;--txt:#f1f5f9;--mut:#94a3b8}
-*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--txt);min-height:100vh}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html{-webkit-text-size-adjust:100%}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--txt);min-height:100vh;touch-action:manipulation;padding-bottom:env(safe-area-inset-bottom)}
 header{padding:20px;max-width:1000px;margin:auto;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
 h1{margin:0;font-size:1.4rem}h1 small{color:var(--mut);font-weight:400;font-size:.9rem;display:block}
 main{max-width:1000px;margin:auto;padding:0 20px 60px;display:grid;gap:16px}
 .card{background:var(--card);border-radius:16px;padding:20px;box-shadow:0 4px 20px rgba(0,0,0,.3)}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}@media(max-width:700px){.grid2{grid-template-columns:1fr}}
-.clock{font-size:2.6rem;font-weight:800;letter-spacing:1px;text-align:center}
+.clock{font-size:clamp(2rem,8vw,2.6rem);font-weight:800;letter-spacing:1px;text-align:center}
 .date{color:var(--mut);text-align:center;margin-bottom:12px;text-transform:capitalize}
 .btnrow{display:flex;gap:12px;justify-content:center;margin:12px 0}
-button{border:0;border-radius:12px;padding:14px 22px;font-size:1rem;font-weight:700;cursor:pointer}
-.btn-in{background:var(--acc);color:#052e16}.btn-in:hover{background:var(--acc2)}
-.btn-out{background:var(--warn);color:#451a03}.btn-out:disabled,.btn-in:disabled{opacity:.35;cursor:not-allowed}
+button{border:0;border-radius:12px;padding:14px 22px;font-size:1rem;font-weight:700;cursor:pointer;min-height:44px}
+.btn-in{background:var(--acc);color:#052e16;flex:1}.btn-in:hover{background:var(--acc2)}
+.btn-out{background:var(--warn);color:#451a03;flex:1}.btn-out:disabled,.btn-in:disabled{opacity:.35;cursor:not-allowed}
 .btn-ghost{background:var(--card2);color:var(--txt);padding:10px 14px;font-size:.9rem}
 .btn-red{background:#7f1d1d;color:#fecaca;padding:8px 12px;font-size:.85rem}
 .btn-excel{background:#2563eb;color:white}
@@ -30,13 +33,27 @@ button{border:0;border-radius:12px;padding:14px 22px;font-size:1rem;font-weight:
 .progress>div{height:100%;background:linear-gradient(90deg,var(--acc),#4ade80);width:0%;transition:width .4s}
 .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}@media(max-width:700px){.kpis{grid-template-columns:repeat(2,1fr)}}
 .kpi{background:#0f172a;border-radius:12px;padding:12px;text-align:center}.kpi b{font-size:1.25rem;display:block}.kpi span{color:var(--mut);font-size:.8rem}
-table{width:100%;border-collapse:collapse;font-size:.92rem}th,td{padding:10px;border-bottom:1px solid #334155;text-align:left}th{color:var(--mut);font-size:.8rem;text-transform:uppercase}
+.tablewrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 -20px;padding:0 20px}
+table{width:100%;border-collapse:collapse;font-size:.92rem;min-width:640px}th,td{padding:10px;border-bottom:1px solid #334155;text-align:left;white-space:nowrap}th{color:var(--mut);font-size:.8rem;text-transform:uppercase}
 .pill{display:inline-block;padding:3px 10px;border-radius:99px;font-size:.78rem;font-weight:700}
 .p-lab{background:#dcfce7;color:#166534}.p-fes{background:#fef9c3;color:#854d0e}.p-fin{background:#e2e8f0;color:#475569}
-input,select{background:#0f172a;border:1px solid #475569;color:var(--txt);border-radius:8px;padding:9px 10px;font-size:.95rem}
+input,select{background:#0f172a;border:1px solid #475569;color:var(--txt);border-radius:8px;padding:12px 10px;font-size:16px;min-height:44px}
 .rowflex{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .muted{color:var(--mut);font-size:.88rem}
-.today-list{margin:0;padding:0;list-style:none}.today-list li{background:#0f172a;margin:6px 0;padding:8px 12px;border-radius:8px;display:flex;justify-content:space-between}
+.today-list{margin:0;padding:0;list-style:none}.today-list li{background:#0f172a;margin:6px 0;padding:8px 12px;border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+@media(max-width:600px){
+  header{padding:12px 12px;padding-top:calc(12px + env(safe-area-inset-top))}
+  main{padding:0 12px 60px}
+  .card{padding:14px;border-radius:14px}
+  h1{font-size:1.15rem}
+  .btnrow{flex-direction:column}
+  .btn-in,.btn-out{width:100%}
+  header .rowflex{width:100%}
+  header .rowflex input[type=month]{flex:1;min-width:0}
+  header .rowflex button{flex:1}
+  .tablewrap table{font-size:.85rem}
+  th,td{padding:8px 6px}
+}
 </style>
 </head>
 <body>
@@ -94,7 +111,7 @@ input,select{background:#0f172a;border:1px solid #475569;color:var(--txt);border
 </div>
 <div class="card">
 <h3 style="margin-top:0">Historial diario</h3>
-<div style="overflow:auto">
+<div class="tablewrap">
 <table>
 <thead><tr><th>Fecha</th><th>Día</th><th>Tipo</th><th>Entradas</th><th>Salidas</th><th>Horas</th><th>Obj.</th><th>Dif.</th><th></th></tr></thead>
 <tbody id="tabla"></tbody>
