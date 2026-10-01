@@ -119,10 +119,12 @@ function saveLocal(){localStorage.setItem(LS_FICH,JSON.stringify(fichajes));loca
 function save(){ saveLocal(); saveCloudPending(); }
 // ---- Firebase realtime (GitHub Pages + Firebase) ----
 const firebaseConfig = {
-  apiKey: "PEGAR_AQUI",
-  authDomain: "PEGAR_AQUI.firebaseapp.com",
-  projectId: "PEGAR_AQUI",
-  appId: "PEGAR_AQUI"
+  apiKey: "AIzaSyCYrFr8tHgM8fLxxBYZ0oNzfgyg6LrJB7Y",
+  authDomain: "control-horario-2c2be.firebaseapp.com",
+  projectId: "control-horario-2c2be",
+  storageBucket: "control-horario-2c2be.firebasestorage.app",
+  messagingSenderId: "386193945611",
+  appId: "1:386193945611:web:9e67fc431e2800df05430e"
 };
 let db=null, cloudReady=false, applyingCloud=false;
 function cloudBadge(txt){ const el=document.getElementById('cloudStatus'); if(el) el.textContent='· '+txt; }
