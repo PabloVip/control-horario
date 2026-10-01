@@ -1,12 +1,12 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Solo login email+contraseña (no anónimo). La contraseña vive en Authentication.
+    // Código simple en meta/config.passHash + login anónimo
     match /dias/{dia} {
-      allow read, write: if request.auth != null && request.auth.token.firebase.sign_in_provider == 'password';
+      allow read, write: if request.auth != null;
     }
     match /meta/{doc} {
-      allow read, write: if request.auth != null && request.auth.token.firebase.sign_in_provider == 'password';
+      allow read, write: if request.auth != null;
     }
   }
 }

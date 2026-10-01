@@ -71,10 +71,9 @@ input,select{background:#0f172a;border:1px solid #475569;color:var(--txt);border
 </div>
 </header>
 <div id="lock"><div class="box">
-<h3 style="margin-top:0">🔒 Acceso privado</h3>
-<p class="muted">Entra con tu email y contraseña de Firebase.</p>
-<input type="email" id="loginEmail" placeholder="Email" autocomplete="username" />
-<input type="password" id="loginPass" placeholder="Contraseña" autocomplete="current-password" />
+<h3 style="margin-top:0">🔒 Código privado</h3>
+<p class="muted" id="lockMsg">Introduce tu código para entrar.</p>
+<input type="password" id="loginCode" placeholder="Código" inputmode="numeric" autocomplete="current-password" />
 <div id="lockErr"></div>
 <button class="btn-in" id="btnLogin" style="width:100%">Entrar</button>
 </div></div>
@@ -181,7 +180,7 @@ async function deleteCloudDia(fecha){
   if(!db || !cloudReady) return;
   try{ await db.collection('dias').doc(fecha).delete(); }catch(e){}
 }
-function initCloud(){
+async function initCloud(){
   if(firebaseConfig.apiKey.includes('PEGAR')){
     cloudBadge('modo local — pega firebaseConfig');
     return;
@@ -189,31 +188,63 @@ function initCloud(){
   try{
     firebase.initializeApp(firebaseConfig);
     db=firebase.firestore();
-    cloudBadge('login requerido');
-    firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL);
-    firebase.auth().onAuthStateChanged(async (user)=>{
-      const lock=document.getElementById('lock');
-      const out=document.getElementById('btnLogout');
-      if(!user || user.isAnonymous){
-        if(lock) lock.style.display='flex';
-        if(out) out.style.display='none';
-        cloudReady=false;
-        cloudBadge('bloqueado 🔒');
-        return;
+    cloudBadge('cargando…');
+    await firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+    try{ await firebase.auth().signInAnonymously(); }catch(e){}
+    // Código simple guardado en Firestore (meta/config.passHash, SHA-256)
+    async function sha256(t){
+      if(crypto.subtle){
+        const b=await crypto.subtle.digest('SHA-256', new TextEncoder().encode('fichaje:'+t));
+        return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('');
       }
-      if(lock) lock.style.display='none';
-      if(out) out.style.display='';
+      let h=0; for(let i=0;i<t.length;i++){h=(h*31+t.charCodeAt(i))|0;} return 'f'+Math.abs(h);
+    }
+    async function getPassHash(){
+      try{
+        const d=await db.doc('meta/config').get();
+        if(d.exists && d.data().passHash) return d.data().passHash;
+      }catch(e){}
+      return null;
+    }
+    const lock=document.getElementById('lock');
+    const msg=document.getElementById('lockMsg');
+    const err=document.getElementById('lockErr');
+    const codeInput=document.getElementById('loginCode');
+    // Si este dispositivo ya entró antes, no pedir código
+    if(localStorage.getItem('fichaje-unlocked')==='1'){
+      lock.style.display='none';
+      document.getElementById('btnLogout').style.display='';
       startSync();
-    });
+      return;
+    }
+    lock.style.display='flex';
+    let storedHash=await getPassHash();
+    if(!storedHash){ msg.textContent='Primera vez: crea tu código (4+ dígitos). Se guarda en la base de datos.'; }
     document.getElementById('btnLogin').onclick=async()=>{
-      const e=document.getElementById('loginEmail').value.trim();
-      const p=document.getElementById('loginPass').value;
-      const err=document.getElementById('lockErr');
+      const code=codeInput.value.trim();
       err.textContent='';
-      try{ await firebase.auth().signInWithEmailAndPassword(e,p); }
-      catch(ex){ err.textContent='Email o contraseña incorrectos.'; }
+      if(code.length<4){ err.textContent='Mínimo 4 caracteres.'; return; }
+      const h=await sha256(code);
+      storedHash=await getPassHash();
+      if(!storedHash){
+        // crear código
+        try{ await db.doc('meta/config').set({passHash:h}); }
+        catch(e){ err.textContent='Sin permiso (activa login anónimo y reglas).'; return; }
+        localStorage.setItem('fichaje-unlocked','1');
+        lock.style.display='none';
+        document.getElementById('btnLogout').style.display='';
+        startSync();
+      }else if(h===storedHash){
+        localStorage.setItem('fichaje-unlocked','1');
+        lock.style.display='none';
+        document.getElementById('btnLogout').style.display='';
+        startSync();
+      }else{
+        err.textContent='Código incorrecto.';
+      }
     };
-    document.getElementById('btnLogout').onclick=()=>firebase.auth().signOut();
+    codeInput.onkeydown=(e)=>{ if(e.key==='Enter') document.getElementById('btnLogin').click(); };
+    document.getElementById('btnLogout').onclick=()=>{ localStorage.removeItem('fichaje-unlocked'); location.reload(); };
   }catch(e){ console.warn(e); cloudBadge('modo local'); }
 }
 async function startSync(){
