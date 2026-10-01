@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mi Fichaje · 3h/día L-V</title>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+<style>
+:root{--bg:#0f172a;--card:#1e293b;--card2:#334155;--acc:#22c55e;--acc2:#16a34a;--warn:#f59e0b;--red:#ef4444;--txt:#f1f5f9;--mut:#94a3b8}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--txt);min-height:100vh}
+header{padding:20px;max-width:1000px;margin:auto;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+h1{margin:0;font-size:1.4rem}h1 small{color:var(--mut);font-weight:400;font-size:.9rem;display:block}
+main{max-width:1000px;margin:auto;padding:0 20px 60px;display:grid;gap:16px}
+.card{background:var(--card);border-radius:16px;padding:20px;box-shadow:0 4px 20px rgba(0,0,0,.3)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}@media(max-width:700px){.grid2{grid-template-columns:1fr}}
+.clock{font-size:2.6rem;font-weight:800;letter-spacing:1px;text-align:center}
+.date{color:var(--mut);text-align:center;margin-bottom:12px;text-transform:capitalize}
+.btnrow{display:flex;gap:12px;justify-content:center;margin:12px 0}
+button{border:0;border-radius:12px;padding:14px 22px;font-size:1rem;font-weight:700;cursor:pointer}
+.btn-in{background:var(--acc);color:#052e16}.btn-in:hover{background:var(--acc2)}
+.btn-out{background:var(--warn);color:#451a03}.btn-out:disabled,.btn-in:disabled{opacity:.35;cursor:not-allowed}
+.btn-ghost{background:var(--card2);color:var(--txt);padding:10px 14px;font-size:.9rem}
+.btn-red{background:#7f1d1d;color:#fecaca;padding:8px 12px;font-size:.85rem}
+.btn-excel{background:#2563eb;color:white}
+.status{text-align:center;padding:10px;border-radius:10px;background:#0f172a;margin:8px 0}
+.progress{height:12px;background:#0f172a;border-radius:99px;overflow:hidden;margin-top:10px}
+.progress>div{height:100%;background:linear-gradient(90deg,var(--acc),#4ade80);width:0%;transition:width .4s}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}@media(max-width:700px){.kpis{grid-template-columns:repeat(2,1fr)}}
+.kpi{background:#0f172a;border-radius:12px;padding:12px;text-align:center}.kpi b{font-size:1.25rem;display:block}.kpi span{color:var(--mut);font-size:.8rem}
+table{width:100%;border-collapse:collapse;font-size:.92rem}th,td{padding:10px;border-bottom:1px solid #334155;text-align:left}th{color:var(--mut);font-size:.8rem;text-transform:uppercase}
+.pill{display:inline-block;padding:3px 10px;border-radius:99px;font-size:.78rem;font-weight:700}
+.p-lab{background:#dcfce7;color:#166534}.p-fes{background:#fef9c3;color:#854d0e}.p-fin{background:#e2e8f0;color:#475569}
+input,select{background:#0f172a;border:1px solid #475569;color:var(--txt);border-radius:8px;padding:9px 10px;font-size:.95rem}
+.rowflex{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.muted{color:var(--mut);font-size:.88rem}
+.today-list{margin:0;padding:0;list-style:none}.today-list li{background:#0f172a;margin:6px 0;padding:8px 12px;border-radius:8px;display:flex;justify-content:space-between}
+</style>
+</head>
+<body>
+<header>
+<div><h1>🕒 Mi Fichaje <small>3 h / día · Lun–Vie · sin festivos · uso propio</small></h1></div>
+<div class="rowflex">
+<input type="month" id="mesFiltro" />
+<button class="btn-ghost btn-excel" id="btnExcel">⬇ Excel</button>
+<button class="btn-ghost" id="btnCSV">CSV</button>
+</div>
+</header>
+<main>
+<div class="grid2">
+<div class="card">
+<div class="clock" id="reloj">--:--:--</div>
+<div class="date" id="fechaHoy"></div>
+<div class="status" id="estado">—</div>
+<div class="btnrow">
+<button class="btn-in" id="btnIn">▶ Fichar entrada</button>
+<button class="btn-out" id="btnOut">⏹ Fichar salida</button>
+</div>
+<div class="progress"><div id="bar"></div></div>
+<p class="muted" style="text-align:center"><span id="hoyHoras">0h 00m</span> / objetivo 3h 00m · <span id="hoyPct">0%</span></p>
+<h3>Hoy</h3>
+<ul class="today-list" id="hoyLista"></ul>
+<div class="rowflex">
+<button class="btn-ghost" id="btnManual">+ Añadir manual</button>
+<button class="btn-ghost" id="btnFestivoHoy">Marcar hoy festivo</button>
+</div>
+</div>
+<div class="card">
+<h3 style="margin-top:0">Resumen del mes <span id="mesLabel" class="muted"></span></h3>
+<div class="kpis">
+<div class="kpi"><b id="kTrab">0h</b><span>Trabajado</span></div>
+<div class="kpi"><b id="kEsp">0h</b><span>Esperado (3h×laborables)</span></div>
+<div class="kpi"><b id="kBal">0h</b><span>Balance</span></div>
+<div class="kpi"><b id="kDias">0</b><span>Días con fichaje</span></div>
+</div>
+<p class="muted" id="detalleMes"></p>
+<h3>Festivos</h3>
+<p class="muted">Nacionales España 2026 cargados + los que añadas. No cuentan como laborables.</p>
+<div class="rowflex">
+<input type="date" id="newFestivo" />
+<input type="text" id="newFestivoName" placeholder="Nombre (ej. Fiesta local)" style="flex:1;min-width:140px" />
+<button class="btn-ghost" id="btnAddFestivo">Añadir</button>
+</div>
+<ul class="today-list" id="listaFestivos"></ul>
+<div class="rowflex" style="margin-top:12px">
+<button class="btn-ghost" id="btnBackup">💾 Copia seguridad</button>
+<button class="btn-ghost" id="btnRestore">📂 Restaurar</button>
+<input type="file" id="fileRestore" accept=".json" style="display:none" />
+<button class="btn-red" id="btnBorrarMes">Borrar mes visible</button>
+</div>
+</div>
+</div>
+<div class="card">
+<h3 style="margin-top:0">Historial diario</h3>
+<div style="overflow:auto">
+<table>
+<thead><tr><th>Fecha</th><th>Día</th><th>Tipo</th><th>Entradas</th><th>Salidas</th><th>Horas</th><th>Obj.</th><th>Dif.</th><th></th></tr></thead>
+<tbody id="tabla"></tbody>
+</table>
+</div>
+</div>
+<p class="muted">Datos guardados solo en este navegador (localStorage). Haz copia de seguridad de vez en cuando. Para el Excel: filtra el mes arriba y pulsa Excel.</p>
+</main>
+<script>
+const LS_FICH = 'fichajes-v1';
+const LS_FES = 'festivos-v1';
+const OBJ_MIN = 180; // 3h
+const FESTIVOS_NACIONALES_2026 = {
+'2026-01-01':'Año Nuevo','2026-01-06':'Reyes',
+'2026-04-03':'Viernes Santo','2026-05-01':'Fiesta Trabajo',
+'2026-08-15':'Asunción','2026-10-12':'Hispanidad',
+'2026-11-01':'Todos los Santos','2026-12-08':'Inmaculada','2026-12-25':'Navidad'
+};
+let fichajes = JSON.parse(localStorage.getItem(LS_FICH)||'{}'); // { 'YYYY-MM-DD': [{in:ts,out:ts|null}] }
+let festivos = JSON.parse(localStorage.getItem(LS_FES)||'null') || {...FESTIVOS_NACIONALES_2026};
+function save(){localStorage.setItem(LS_FICH,JSON.stringify(fichajes));localStorage.setItem(LS_FES,JSON.stringify(festivos));}
+// Datos iniciales: 15/09/2026 → 30/09/2026 laborables 7:00-10:00 (solo si no hay nada guardado)
+(function seedInicial(){
+  if(Object.keys(fichajes).length>0) return;
+  if(localStorage.getItem('fichajes-seed-15sept')) return;
+  const ini=new Date(2026,8,15); const fin=new Date(2026,8,30);
+  for(let d=new Date(ini); d<=fin; d.setDate(d.getDate()+1)){
+    const w=d.getDay(); if(w===0||w===6) continue;
+    const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    if(festivos[k]) continue;
+    const tin=new Date(d); tin.setHours(7,0,0,0);
+    const tout=new Date(d); tout.setHours(10,0,0,0);
+    fichajes[k]=[{in:tin.getTime(),out:tout.getTime()}];
+  }
+  localStorage.setItem('fichajes-seed-15sept','1');
+  save();
+})();
+const pad=n=>String(n).padStart(2,'0');
+const ymd=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const fmtH=m=>`${Math.floor(m/60)}h ${pad(Math.round(m%60))}m`;
+const fmtHM=ts=>{if(!ts)return'—';const d=new Date(ts);return pad(d.getHours())+':'+pad(d.getMinutes());};
+const fmtDec=min=>(min/60).toFixed(2);
+function esFinde(fechaStr){const d=new Date(fechaStr+'T12:00:00');const w=d.getDay();return w===0||w===6;}
+function tipoDia(f){if(festivos[f])return'festivo';if(esFinde(f))return'finde';return'laborable';}
+function minutosDia(f){const arr=fichajes[f]||[];let t=0;for(const p of arr){if(p.in&&p.out&&p.out>p.in)t+=(p.out-p.in)/60000;}return t;}
+function abiertaHoy(){const h=ymd(new Date());const arr=fichajes[h]||[];return arr.find(p=>p.in&&!p.out)||null;}
+// reloj
+function tick(){const n=new Date();document.getElementById('reloj').textContent=pad(n.getHours())+':'+pad(n.getMinutes())+':'+pad(n.getSeconds());
+document.getElementById('fechaHoy').textContent=n.toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long',year:'numeric'});}
+setInterval(tick,1000);tick();
+// mes filtro default = mes actual
+const mesFiltro=document.getElementById('mesFiltro');
+if(!mesFiltro.value){const n=new Date();mesFiltro.value=`${n.getFullYear()}-${pad(n.getMonth()+1)}`;}
+mesFiltro.addEventListener('change',render);
+function diasDelMes(ym){const[y,m]=ym.split('-').map(Number);const out=[];const last=new Date(y,m,0).getDate();for(let d=1;d<=last;d++)out.push(`${y}-${pad(m)}-${pad(d)}`);return out;}
+function render(){
+const hoy=ymd(new Date());
+const ab=abiertaHoy();
+document.getElementById('btnIn').disabled=!!ab;
+document.getElementById('btnOut').disabled=!ab;
+document.getElementById('estado').textContent=ab?`● Trabajando desde las ${fmtHM(ab.in)} — pulsa salida al terminar`:(tipoDia(hoy)==='laborable'?'Listo para fichar. Objetivo hoy: 3h 00m':'Hoy es '+tipoDia(hoy)+'. Puedes fichar igual si trabajas, pero no cuenta como obligatorio.');
+const minHoy=minutosDia(hoy);
+document.getElementById('hoyHoras').textContent=fmtH(minHoy);
+const pct=Math.min(100,Math.round(minHoy/OBJ_MIN*100));
+document.getElementById('hoyPct').textContent=pct+'%';
+document.getElementById('bar').style.width=pct+'%';
+const arr=fichajes[hoy]||[];
+document.getElementById('hoyLista').innerHTML=arr.length?arr.map((p,i)=>`<li><span>#${i+1} ${fmtHM(p.in)} → ${p.out?fmtHM(p.out):'<b>en curso…</b>'}</span><button class="btn-red" onclick="borrarPar('${hoy}',${i})">✕</button></li>`).join(''):'<li><span class="muted">Sin fichajes hoy</span></li>';
+// mes
+const ym=mesFiltro.value;const dias=diasDelMes(ym);
+document.getElementById('mesLabel').textContent='· '+new Date(ym+'-02T12:00').toLocaleDateString('es-ES',{month:'long',year:'numeric'});
+let trab=0,esp=0,ndias=0;
+let filas='';
+for(const f of dias){
+const t=tipoDia(f);const min=minutosDia(f);const obj=(t==='laborable')?OBJ_MIN:0;
+if(t==='laborable')esp+=OBJ_MIN;if(min>0){trab+=min;ndias++;}
+const dif=min-obj;
+const dObj=new Date(f+'T12:00:00');
+const diaN=dObj.toLocaleDateString('es-ES',{weekday:'short'});
+const entradas=(fichajes[f]||[]).map(p=>fmtHM(p.in)).join('<br>')||'—';
+const salidas=(fichajes[f]||[]).map(p=>p.out?fmtHM(p.out):'…').join('<br>')||'—';
+const pill=t==='laborable'?'<span class="pill p-lab">Laborable</span>':t==='festivo'?`<span class="pill p-fes" title="${festivos[f]||''}">Festivo</span>`:'<span class="pill p-fin">Finde</span>';
+filas+=`<tr><td>${f.slice(8)}/${f.slice(5,7)}/${f.slice(0,4)}</td><td>${diaN}</td><td>${pill}</td><td>${entradas}</td><td>${salidas}</td><td><b>${min>0?fmtH(min):'—'}</b><br><span class="muted">${min>0?fmtDec(min)+' h':''}</span></td><td>${fmtH(obj)}</td><td style="color:${dif<0&&obj>0?'#fca5a5':'#86efac'}">${(obj>0||min>0)?((dif>=0?'+':'')+Math.round(dif)+' min'):''}</td><td>${(fichajes[f]&&fichajes[f].length)?`<button class="btn-red" onclick="borrarDia('${f}')">Borrar</button>`:''}</td></tr>`;
+}
+document.getElementById('tabla').innerHTML=filas;
+document.getElementById('kTrab').textContent=fmtDec(trab)+' h';
+document.getElementById('kEsp').textContent=fmtDec(esp)+' h';
+const bal=trab-esp;
+document.getElementById('kBal').textContent=(bal>=0?'+':'')+fmtDec(bal)+' h';
+document.getElementById('kBal').style.color=bal>=0?'#86efac':'#fca5a5';
+document.getElementById('kDias').textContent=ndias;
+const nLab=dias.filter(d=>tipoDia(d)==='laborable').length;
+document.getElementById('detalleMes').textContent=`${nLab} días laborables × 3h = ${fmtDec(esp)} h esperadas. Llevas ${fmtDec(trab)} h (${pctBar(trab,esp)}).`;
+const lf=Object.keys(festivos).filter(k=>k.startsWith(ym)).sort();
+document.getElementById('listaFestivos').innerHTML=lf.length?lf.map(k=>`<li><span>${k} · ${festivos[k]}</span><button class="btn-red" onclick="delFestivo('${k}')">✕</button></li>`).join(''):'<li><span class="muted">No hay festivos este mes</span></li>';
+}
+function pctBar(a,b){if(!b)return'—';return Math.round(a/b*100)+'%';}
+window.borrarPar=(fecha,i)=>{fichajes[fecha].splice(i,1);if(!fichajes[fecha].length)delete fichajes[fecha];save();render();};
+window.borrarDia=(f)=>{if(confirm('Borrar fichajes del '+f+'?')){delete fichajes[f];save();render();}};
+window.delFestivo=(k)=>{delete festivos[k];save();render();};
+document.getElementById('btnIn').onclick=()=>{const h=ymd(new Date());fichajes[h]=fichajes[h]||[];fichajes[h].push({in:Date.now(),out:null});save();render();};
+document.getElementById('btnOut').onclick=()=>{const ab=abiertaHoy();if(ab){ab.out=Date.now();save();render();}};
+document.getElementById('btnManual').onclick=()=>{
+const f=prompt('Fecha (YYYY-MM-DD), vacío = hoy:',ymd(new Date()));if(f===null)return;
+const fecha=(f||ymd(new Date())).trim();
+const e=prompt('Hora entrada HH:MM (ej. 09:00):');if(!e)return;
+const s=prompt('Hora salida HH:MM (ej. 12:00). Vacío = dejar abierta:','');
+const[dH,dM]=e.split(':').map(Number);const base=new Date(fecha+'T12:00:00');
+const tin=new Date(base);tin.setHours(dH||0,dM||0,0,0);
+let tout=null;if(s&&s.includes(':')){const[oH,oM]=s.split(':').map(Number);tout=new Date(base);tout.setHours(oH||0,oM||0,0,0);}
+fichajes[fecha]=fichajes[fecha]||[];fichajes[fecha].push({in:tin.getTime(),out:tout?tout.getTime():null});save();render();};
+document.getElementById('btnFestivoHoy').onclick=()=>{const h=ymd(new Date());const n=prompt('Nombre del festivo:','Festivo');if(n!==null){festivos[h]=n||'Festivo';save();render();}};
+document.getElementById('btnAddFestivo').onclick=()=>{const k=document.getElementById('newFestivo').value;const n=document.getElementById('newFestivoName').value||'Festivo';if(!k){alert('Elige fecha');return;}festivos[k]=n;save();render();document.getElementById('newFestivo').value='';document.getElementById('newFestivoName').value='';};
+document.getElementById('btnBackup').onclick=()=>{const blob=new Blob([JSON.stringify({fichajes,festivos},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='fichajes-backup.json';a.click();};
+document.getElementById('btnRestore').onclick=()=>document.getElementById('fileRestore').click();
+document.getElementById('fileRestore').onchange=(e)=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const j=JSON.parse(r.result);if(j.fichajes)fichajes=j.fichajes;if(j.festivos)festivos=j.festivos;save();render();}catch{alert('Archivo no válido');}};r.readAsText(f);};
+document.getElementById('btnBorrarMes').onclick=()=>{const ym=mesFiltro.value;if(!confirm('Borrar todos los fichajes de '+ym+'?'))return;for(const k of Object.keys(fichajes)){if(k.startsWith(ym))delete fichajes[k];}save();render();};
+// EXPORT EXCEL
+function filasExcel(){
+const ym=mesFiltro.value;const dias=diasDelMes(ym);
+return dias.map(f=>{
+const t=tipoDia(f);const min=minutosDia(f);const obj=t==='laborable'?OBJ_MIN:0;
+const arr=fichajes[f]||[];
+return{Fecha:f,Día:new Date(f+'T12:00:00').toLocaleDateString('es-ES',{weekday:'long'}),Tipo:t==='laborable'?'Laborable (L-V)':t==='festivo'?('Festivo - '+(festivos[f]||'')):'Fin de semana',
+Entradas:arr.map(p=>fmtHM(p.in)).join(' / '),Salidas:arr.map(p=>p.out?fmtHM(p.out):'').join(' / '),
+'Horas trabajadas (h)':min>0?+(min/60).toFixed(2):0,'Horas trabajadas (texto)':min>0?fmtH(min):'',
+'Objetivo (h)':+(obj/60).toFixed(2),'Diferencia (min)':(obj>0||min>0)?Math.round(min-obj):0};
+});}
+document.getElementById('btnExcel').onclick=()=>{
+const data=filasExcel();
+const totT=data.reduce((a,r)=>a+r['Horas trabajadas (h)'],0);
+const totO=data.reduce((a,r)=>a+r['Objetivo (h)'],0);
+data.push({Fecha:'TOTAL',Día:'','Tipo':'','Entradas':'','Salidas':'','Horas trabajadas (h)':+totT.toFixed(2),'Horas trabajadas (texto)':fmtH(totT*60),'Objetivo (h)':+totO.toFixed(2),'Diferencia (min)':Math.round((totT-totO)*60)});
+try{
+const ws=XLSX.utils.json_to_sheet(data);
+ws['!cols']=[{wch:12},{wch:12},{wch:24},{wch:14},{wch:14},{wch:16},{wch:18},{wch:12},{wch:14}];
+const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Fichajes '+mesFiltro.value);
+XLSX.writeFile(wb,`fichajes_${mesFiltro.value}.xlsx`);
+}catch(e){alert('No se pudo generar el Excel (¿sin internet para la librería?). Usa CSV.');}};
+document.getElementById('btnCSV').onclick=()=>{
+const data=filasExcel();
+const head=Object.keys(data[0]);
+const csv=[head.join(';')].concat(data.map(r=>head.map(h=>`"${r[h]}"`).join(';'))).join('\n');
+const blob=new Blob(['\ufeff'+csv],{type:'text/csv'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`fichajes_${mesFiltro.value}.csv`;a.click();};
+render();
+</script>
+</body>
+</html>
