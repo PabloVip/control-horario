@@ -54,6 +54,10 @@ input,select{background:#0f172a;border:1px solid #475569;color:var(--txt);border
   .tablewrap table{font-size:.85rem}
   th,td{padding:8px 6px}
 }
+#lock{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:20px;z-index:50}
+#lock .box{background:var(--card);border-radius:16px;padding:24px;max-width:360px;width:100%}
+#lock input{width:100%;margin:6px 0}
+#lockErr{color:#fca5a5;font-size:.9rem;min-height:1.2em}
 </style>
 </head>
 <body>
@@ -63,8 +67,17 @@ input,select{background:#0f172a;border:1px solid #475569;color:var(--txt);border
 <input type="month" id="mesFiltro" />
 <button class="btn-ghost btn-excel" id="btnExcel">⬇ Excel</button>
 <button class="btn-ghost" id="btnCSV">CSV</button>
+<button class="btn-ghost" id="btnLogout" style="display:none">Salir</button>
 </div>
 </header>
+<div id="lock"><div class="box">
+<h3 style="margin-top:0">🔒 Acceso privado</h3>
+<p class="muted">Entra con tu email y contraseña de Firebase.</p>
+<input type="email" id="loginEmail" placeholder="Email" autocomplete="username" />
+<input type="password" id="loginPass" placeholder="Contraseña" autocomplete="current-password" />
+<div id="lockErr"></div>
+<button class="btn-in" id="btnLogin" style="width:100%">Entrar</button>
+</div></div>
 <main>
 <div class="grid2">
 <div class="card">
@@ -176,9 +189,36 @@ function initCloud(){
   try{
     firebase.initializeApp(firebaseConfig);
     db=firebase.firestore();
-    cloudBadge('conectando…');
-    firebase.auth().signInAnonymously().then(async ()=>{
-      // 1) subir semilla local si la nube está vacía (primera vez)
+    cloudBadge('login requerido');
+    firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+    firebase.auth().onAuthStateChanged(async (user)=>{
+      const lock=document.getElementById('lock');
+      const out=document.getElementById('btnLogout');
+      if(!user || user.isAnonymous){
+        if(lock) lock.style.display='flex';
+        if(out) out.style.display='none';
+        cloudReady=false;
+        cloudBadge('bloqueado 🔒');
+        return;
+      }
+      if(lock) lock.style.display='none';
+      if(out) out.style.display='';
+      startSync();
+    });
+    document.getElementById('btnLogin').onclick=async()=>{
+      const e=document.getElementById('loginEmail').value.trim();
+      const p=document.getElementById('loginPass').value;
+      const err=document.getElementById('lockErr');
+      err.textContent='';
+      try{ await firebase.auth().signInWithEmailAndPassword(e,p); }
+      catch(ex){ err.textContent='Email o contraseña incorrectos.'; }
+    };
+    document.getElementById('btnLogout').onclick=()=>firebase.auth().signOut();
+  }catch(e){ console.warn(e); cloudBadge('modo local'); }
+}
+async function startSync(){
+  cloudBadge('conectando…');
+  // 1) subir semilla local si la nube está vacía (primera vez)
       try{
         const snap=await db.collection('dias').limit(1).get();
         if(snap.empty && Object.keys(fichajes).length>0){
@@ -212,8 +252,6 @@ function initCloud(){
         }
       });
       cloudReady=true;
-    }).catch(()=>cloudBadge('auth error (local ok)'));
-  }catch(e){ console.warn(e); cloudBadge('modo local'); }
 }
 // Datos iniciales: 15/09/2026 → 30/09/2026 laborables 7:00-10:00 (solo si no hay nada guardado)
 (function seedInicial(){
