@@ -6,6 +6,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0f172a">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <title>Mi Fichaje · 3h/día L-V</title>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -62,7 +65,7 @@ input,select{background:#0f172a;border:1px solid #475569;color:var(--txt);border
 </head>
 <body>
 <header>
-<div><h1>🕒 Mi Fichaje <small>3 h / día · Lun–Vie · sin festivos · uso propio <span id="cloudStatus">· modo local</span></small></h1></div>
+<div><h1><img src="favicon.svg" alt="" width="28" height="28" style="vertical-align:-5px;border-radius:7px"> Mi Fichaje <small>3 h / día · Lun–Vie · sin festivos · uso propio <span id="cloudStatus">· modo local</span></small></h1></div>
 <div class="rowflex">
 <input type="month" id="mesFiltro" />
 <button class="btn-ghost btn-excel" id="btnExcel">⬇ Excel</button>
