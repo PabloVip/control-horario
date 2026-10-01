@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mi Fichaje · 3h/día L-V</title>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <style>
 :root{--bg:#0f172a;--card:#1e293b;--card2:#334155;--acc:#22c55e;--acc2:#16a34a;--warn:#f59e0b;--red:#ef4444;--txt:#f1f5f9;--mut:#94a3b8}
 *{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--txt);min-height:100vh}
@@ -38,7 +41,7 @@ input,select{background:#0f172a;border:1px solid #475569;color:var(--txt);border
 </head>
 <body>
 <header>
-<div><h1>🕒 Mi Fichaje <small>3 h / día · Lun–Vie · sin festivos · uso propio</small></h1></div>
+<div><h1>🕒 Mi Fichaje <small>3 h / día · Lun–Vie · sin festivos · uso propio <span id="cloudStatus">· modo local</span></small></h1></div>
 <div class="rowflex">
 <input type="month" id="mesFiltro" />
 <button class="btn-ghost btn-excel" id="btnExcel">⬇ Excel</button>
@@ -112,7 +115,87 @@ const FESTIVOS_NACIONALES_2026 = {
 };
 let fichajes = JSON.parse(localStorage.getItem(LS_FICH)||'{}'); // { 'YYYY-MM-DD': [{in:ts,out:ts|null}] }
 let festivos = JSON.parse(localStorage.getItem(LS_FES)||'null') || {...FESTIVOS_NACIONALES_2026};
-function save(){localStorage.setItem(LS_FICH,JSON.stringify(fichajes));localStorage.setItem(LS_FES,JSON.stringify(festivos));}
+function saveLocal(){localStorage.setItem(LS_FICH,JSON.stringify(fichajes));localStorage.setItem(LS_FES,JSON.stringify(festivos));}
+function save(){ saveLocal(); saveCloudPending(); }
+// ---- Firebase realtime (GitHub Pages + Firebase) ----
+const firebaseConfig = {
+  apiKey: "PEGAR_AQUI",
+  authDomain: "PEGAR_AQUI.firebaseapp.com",
+  projectId: "PEGAR_AQUI",
+  appId: "PEGAR_AQUI"
+};
+let db=null, cloudReady=false, applyingCloud=false;
+function cloudBadge(txt){ const el=document.getElementById('cloudStatus'); if(el) el.textContent='· '+txt; }
+let cloudTimer=null;
+function saveCloudPending(){
+  if(!db || !cloudReady || applyingCloud) return;
+  clearTimeout(cloudTimer);
+  cloudTimer=setTimeout(saveCloudNow, 800);
+}
+async function saveCloudNow(){
+  if(!db || !cloudReady) return;
+  try{
+    cloudBadge('guardando…');
+    const batch=db.batch();
+    for(const [fecha,pares] of Object.entries(fichajes)){
+      batch.set(db.collection('dias').doc(fecha), {pares, updatedAt: firebase.firestore.FieldValue.serverTimestamp()}, {merge:true});
+    }
+    batch.set(db.doc('meta/festivos'), {map: festivos}, {merge:true});
+    await batch.commit();
+    cloudBadge('sincronizado ☁');
+  }catch(e){ console.warn(e); cloudBadge('error nube (local ok)'); }
+}
+async function deleteCloudDia(fecha){
+  if(!db || !cloudReady) return;
+  try{ await db.collection('dias').doc(fecha).delete(); }catch(e){}
+}
+function initCloud(){
+  if(firebaseConfig.apiKey.includes('PEGAR')){
+    cloudBadge('modo local — pega firebaseConfig');
+    return;
+  }
+  try{
+    firebase.initializeApp(firebaseConfig);
+    db=firebase.firestore();
+    cloudBadge('conectando…');
+    firebase.auth().signInAnonymously().then(async ()=>{
+      // 1) subir semilla local si la nube está vacía (primera vez)
+      try{
+        const snap=await db.collection('dias').limit(1).get();
+        if(snap.empty && Object.keys(fichajes).length>0){
+          await saveCloudNow();
+        }
+        const metaSnap=await db.doc('meta/festivos').get();
+        if(!metaSnap.exists && Object.keys(festivos).length>0){
+          await db.doc('meta/festivos').set({map:festivos});
+        }
+      }catch(e){ console.warn(e); }
+      // 2) escuchar cambios en tiempo real
+      db.collection('dias').onSnapshot(s=>{
+        applyingCloud=true;
+        const next={};
+        s.forEach(doc=>{ next[doc.id]=doc.data().pares||[]; });
+        // solo pisar si hay algo (evita borrar local al arrancar con nube vacía)
+        if(Object.keys(next).length>0 || Object.keys(fichajes).length===0){
+          fichajes=next;
+        }
+        saveLocal(); render();
+        applyingCloud=false;
+        cloudReady=true;
+        cloudBadge('sincronizado ☁ tiempo real');
+      }, ()=>cloudBadge('sin conexión (local ok)'));
+      db.doc('meta/festivos').onSnapshot(d=>{
+        if(d.exists && d.data().map){
+          applyingCloud=true;
+          festivos={...FESTIVOS_NACIONALES_2026, ...d.data().map};
+          saveLocal(); render();
+          applyingCloud=false;
+        }
+      });
+      cloudReady=true;
+    }).catch(()=>cloudBadge('auth error (local ok)'));
+  }catch(e){ console.warn(e); cloudBadge('modo local'); }
+}
 // Datos iniciales: 15/09/2026 → 30/09/2026 laborables 7:00-10:00 (solo si no hay nada guardado)
 (function seedInicial(){
   if(Object.keys(fichajes).length>0) return;
@@ -189,8 +272,8 @@ const lf=Object.keys(festivos).filter(k=>k.startsWith(ym)).sort();
 document.getElementById('listaFestivos').innerHTML=lf.length?lf.map(k=>`<li><span>${k} · ${festivos[k]}</span><button class="btn-red" onclick="delFestivo('${k}')">✕</button></li>`).join(''):'<li><span class="muted">No hay festivos este mes</span></li>';
 }
 function pctBar(a,b){if(!b)return'—';return Math.round(a/b*100)+'%';}
-window.borrarPar=(fecha,i)=>{fichajes[fecha].splice(i,1);if(!fichajes[fecha].length)delete fichajes[fecha];save();render();};
-window.borrarDia=(f)=>{if(confirm('Borrar fichajes del '+f+'?')){delete fichajes[f];save();render();}};
+window.borrarPar=(fecha,i)=>{fichajes[fecha].splice(i,1);if(!fichajes[fecha].length){delete fichajes[fecha]; deleteCloudDia(fecha);}save();render();};
+window.borrarDia=(f)=>{if(confirm('Borrar fichajes del '+f+'?')){delete fichajes[f];deleteCloudDia(f);save();render();}};
 window.delFestivo=(k)=>{delete festivos[k];save();render();};
 document.getElementById('btnIn').onclick=()=>{const h=ymd(new Date());fichajes[h]=fichajes[h]||[];fichajes[h].push({in:Date.now(),out:null});save();render();};
 document.getElementById('btnOut').onclick=()=>{const ab=abiertaHoy();if(ab){ab.out=Date.now();save();render();}};
@@ -208,7 +291,7 @@ document.getElementById('btnAddFestivo').onclick=()=>{const k=document.getElemen
 document.getElementById('btnBackup').onclick=()=>{const blob=new Blob([JSON.stringify({fichajes,festivos},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='fichajes-backup.json';a.click();};
 document.getElementById('btnRestore').onclick=()=>document.getElementById('fileRestore').click();
 document.getElementById('fileRestore').onchange=(e)=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const j=JSON.parse(r.result);if(j.fichajes)fichajes=j.fichajes;if(j.festivos)festivos=j.festivos;save();render();}catch{alert('Archivo no válido');}};r.readAsText(f);};
-document.getElementById('btnBorrarMes').onclick=()=>{const ym=mesFiltro.value;if(!confirm('Borrar todos los fichajes de '+ym+'?'))return;for(const k of Object.keys(fichajes)){if(k.startsWith(ym))delete fichajes[k];}save();render();};
+document.getElementById('btnBorrarMes').onclick=async()=>{const ym=mesFiltro.value;if(!confirm('Borrar todos los fichajes de '+ym+'?'))return;for(const k of Object.keys(fichajes)){if(k.startsWith(ym)){delete fichajes[k]; await deleteCloudDia(k);}}save();render();};
 // EXPORT EXCEL
 function filasExcel(){
 const ym=mesFiltro.value;const dias=diasDelMes(ym);
@@ -237,6 +320,7 @@ const head=Object.keys(data[0]);
 const csv=[head.join(';')].concat(data.map(r=>head.map(h=>`"${r[h]}"`).join(';'))).join('\n');
 const blob=new Blob(['\ufeff'+csv],{type:'text/csv'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`fichajes_${mesFiltro.value}.csv`;a.click();};
 render();
+initCloud();
 </script>
 </body>
 </html>
